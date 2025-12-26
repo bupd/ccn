@@ -1,5 +1,7 @@
 # Claude Code Notify (CCN)
 
+![Claude Code Notify](claude-code-notify.png)
+
 Desktop notifications for Claude Code CLI with tmux integration.
 
 ## For Claude Code Power Users

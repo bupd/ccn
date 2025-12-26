@@ -1,5 +1,7 @@
 # Claude Code Notify (CCN)
 
+![Claude Code Notify](docs/claude-code-notify.png)
+
 Desktop notifications for Claude Code with tmux integration.
 
 [View Documentation](https://cc-notify.bupd.xyz)
@@ -45,6 +47,19 @@ chmod +x ~/.local/bin/claude-notify
 - [Installation Guide](https://cc-notify.bupd.xyz/#/installation)
 - [Configuration](https://cc-notify.bupd.xyz/#/configuration)
 - [Keyboard Navigation](https://cc-notify.bupd.xyz/#/keyboard-navigation)
+
+## Why Not a Full Orchestration Tool?
+
+There are great multi-agent orchestration tools out there:
+
+- [claude-squad](https://github.com/smtg-ai/claude-squad) - manage multiple AI terminal agents
+- [claude-colony](https://github.com/MakingJamie/claude-colony) - tmux-based multi-agent orchestration
+- [claude-code-agent-farm](https://github.com/Dicklesworthstone/claude_code_agent_farm) - run 20+ agents in parallel
+- [ccmanager](https://github.com/ryanhoangt/ccmanager) - Claude Code session manager
+
+CCN is intentionally minimal. No meta layer. No orchestration. Just notifications.
+
+I work alongside Claude across multiple features running in parallel. I prefer manual approval over yolo mode. When context gets full, Claude starts yak shaving. These notifications help me monitor all my instances without the overhead of orchestrators. Simple and minimal.
 
 ## How It Works
 
