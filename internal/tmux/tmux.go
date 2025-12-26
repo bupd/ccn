@@ -62,17 +62,17 @@ func IsInsideTmux() bool {
 }
 
 // SwitchTo switches to the given session/target
+// When called from background (no TTY), switches the most recent client
 func SwitchTo(target string) error {
-	if IsInsideTmux() {
-		cmd := exec.Command("tmux", "switch-client", "-t", target)
+	// Always use switch-client - it works even from background
+	// -t specifies the target session, the current/most-recent client will switch
+	cmd := exec.Command("tmux", "switch-client", "-t", target)
+	if err := cmd.Run(); err != nil {
+		// Fallback: try selecting the pane directly
+		cmd = exec.Command("tmux", "select-window", "-t", target)
 		return cmd.Run()
 	}
-	// Outside tmux: attach in current terminal
-	cmd := exec.Command("tmux", "attach", "-t", target)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	return nil
 }
 
 // SessionFromTarget extracts session name from target (session:window.pane)
