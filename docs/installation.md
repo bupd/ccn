@@ -27,8 +27,8 @@ Or add it to your window manager's autostart.
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-repo/claude-code-notify.git
-cd claude-code-notify
+git clone https://github.com/bupd/ccn.git
+cd ccn
 
 # Copy the script to your local bin
 cp scripts/claude-notify ~/.local/bin/
