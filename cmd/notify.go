@@ -17,6 +17,8 @@ type hookInput struct {
 	HookEventName    string `json:"hook_event_name"`
 	Message          string `json:"message"`
 	NotificationType string `json:"notification_type"`
+	// Stop hook fields
+	StopReason string `json:"stop_reason,omitempty"`
 }
 
 var notifyCmd = &cobra.Command{
@@ -62,15 +64,32 @@ func runNotify(cmd *cobra.Command, args []string) error {
 		title = fmt.Sprintf("%s (+%d more)", session, len(panes)-1)
 	}
 
-	body := input.Message
-	if body == "" {
-		body = "Claude needs input"
+	var body string
+	var urgency notify.Urgency
+
+	switch input.HookEventName {
+	case "Stop":
+		body = "Claude finished - waiting for input"
+		urgency = notify.UrgencyNormal
+	case "Notification":
+		body = input.Message
+		if body == "" {
+			body = "Claude needs input"
+		}
+		urgency = notify.UrgencyFromType(input.NotificationType)
+	default:
+		// Unknown hook, use message or default
+		body = input.Message
+		if body == "" {
+			body = "Claude notification"
+		}
+		urgency = notify.UrgencyNormal
 	}
 
 	n := notify.Notification{
 		Title:   title,
 		Body:    body,
-		Urgency: notify.UrgencyFromType(input.NotificationType),
+		Urgency: urgency,
 		Actions: []notify.Action{
 			{ID: "open", Label: "Open"},
 		},
