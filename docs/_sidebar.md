@@ -1,0 +1,4 @@
+- [Home](/)
+- [Installation](installation.md)
+- [Configuration](configuration.md)
+- [Keyboard Navigation](keyboard-navigation.md)
