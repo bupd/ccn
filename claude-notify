@@ -1,0 +1,22 @@
+#!/bin/bash
+# Capture tmux info while we have context
+TMUX_SOCKET="$TMUX"
+TMUX_TARGET=$(tmux display-message -p '#S:#I.#P')
+TMUX_SESSION=$(tmux display-message -p '#S')
+TMUX_WINDOW=$(tmux display-message -p '#I')
+TMUX_PANE=$(tmux display-message -p '#P')
+TMUX_WINDOW_NAME=$(tmux display-message -p '#S:#W')
+
+# Send notification with action button
+ACTION=$(dunstify -A "switch,Go to window" \
+    "Claude Code - $TMUX_WINDOW_NAME" \
+    "Waiting for your input" \
+    -t 0)
+
+# If user clicked the action, switch to the pane
+if [ "$ACTION" = "switch" ]; then
+    export TMUX="$TMUX_SOCKET"
+    tmux select-window -t "$TMUX_SESSION:$TMUX_WINDOW"
+    tmux select-pane -t "$TMUX_SESSION:$TMUX_WINDOW.$TMUX_PANE"
+    tmux switch-client -t "$TMUX_SESSION"
+fi
