@@ -5,7 +5,66 @@
   <title>Claude Code Notify</title>
   <meta name="description" content="Desktop notifications for Claude Code with tmux integration">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify@4/lib/themes/dark.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify-themeable@0/dist/css/theme-simple.min.css">
+  <style>
+    :root {
+      --base-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif;
+      --base-font-size: 16px;
+      --base-line-height: 1.6;
+      --base-color: #2e3440;
+      --base-background-color: #fff;
+
+      --sidebar-width: 260px;
+      --sidebar-background: #f8f9fa;
+      --sidebar-border-color: #e9ecef;
+      --sidebar-nav-link-color: #495057;
+      --sidebar-nav-link-color--active: #7c3aed;
+      --sidebar-nav-link-border-color--active: #7c3aed;
+
+      --link-color: #7c3aed;
+      --link-color--hover: #6d28d9;
+
+      --heading-color: #1a1a2e;
+      --heading-h1-font-size: 2rem;
+      --heading-h2-font-size: 1.5rem;
+      --heading-h2-border-color: #e9ecef;
+
+      --code-inline-background: #f1f3f5;
+      --code-inline-color: #7c3aed;
+      --code-block-background: #1e1e2e;
+      --code-block-text-color: #cdd6f4;
+
+      --blockquote-border-color: #7c3aed;
+      --blockquote-background: #f8f5ff;
+
+      --notice-tip-background: #f0fdf4;
+      --notice-tip-border-color: #22c55e;
+    }
+
+    .sidebar-nav > ul > li > a {
+      font-weight: 600;
+    }
+
+    .markdown-section h1 {
+      border-bottom: 2px solid #e9ecef;
+      padding-bottom: 0.5rem;
+    }
+
+    .markdown-section code {
+      border-radius: 4px;
+      padding: 2px 6px;
+    }
+
+    .markdown-section pre {
+      border-radius: 8px;
+      padding: 1rem;
+    }
+
+    .app-name-link {
+      font-weight: 700 !important;
+      color: #7c3aed !important;
+    }
+  </style>
 </head>
 <body>
   <div id="app"></div>
@@ -24,6 +83,9 @@
     }
   </script>
   <script src="https://cdn.jsdelivr.net/npm/docsify@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify-themeable@0/dist/js/docsify-themeable.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/plugins/search.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-bash.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-json.min.js"></script>
 </body>
 </html>
