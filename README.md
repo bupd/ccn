@@ -1,6 +1,8 @@
-# Claude Code Notify
+# Claude Code Notify (CCN)
 
 Desktop notifications for Claude Code with tmux integration.
+
+[View Documentation](https://cc-notify.bupd.xyz)
 
 ## The Problem
 
@@ -28,7 +30,7 @@ cp scripts/claude-notify ~/.local/bin/
 chmod +x ~/.local/bin/claude-notify
 
 # 2. Add hooks to your Claude Code settings (~/.claude/settings.json)
-# See docs/installation.md for details
+# See https://cc-notify.bupd.xyz/#/installation for details
 ```
 
 ## Requirements
@@ -40,9 +42,9 @@ chmod +x ~/.local/bin/claude-notify
 
 ## Documentation
 
-- [Installation Guide](docs/installation.md)
-- [Configuration](docs/configuration.md)
-- [Keyboard Navigation](docs/keyboard-navigation.md)
+- [Installation Guide](https://cc-notify.bupd.xyz/#/installation)
+- [Configuration](https://cc-notify.bupd.xyz/#/configuration)
+- [Keyboard Navigation](https://cc-notify.bupd.xyz/#/keyboard-navigation)
 
 ## How It Works
 
