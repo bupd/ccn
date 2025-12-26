@@ -26,3 +26,9 @@ never use long dashes.
 follow titlecase for pr title.
 
 stop and return to me to discuss if anything requires a significant refactor.
+
+## Git commits:
+- commit after each file change, not batch commits
+- use conventional commit pattern: feat:, fix:, chore:, refactor:, docs:, test:
+- no commit descriptions, no AI credits
+- keep commit messages concise
