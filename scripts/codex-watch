@@ -1,0 +1,194 @@
+#!/usr/bin/env bash
+set -u
+
+usage() {
+    cat <<'USAGE'
+Usage: codex-watch [options]
+
+Options:
+  --sessions-dir DIR       Codex sessions root (default: ~/.codex/sessions)
+  --notify-cmd PATH        codex-notify command path (default: ~/.local/bin/codex-notify)
+  --interval SECONDS       Poll interval (default: 1)
+  --title TITLE            Notification title (default: Codex Agent)
+  --tmux-target TARGET     Force tmux target for notification action
+  --enable-switch          Enable click-to-switch action in notifications
+  --start-at-beginning     Parse existing files from byte 0 (default: start at end)
+  --verbose                Print debug logs
+  -h, --help               Show this help
+
+Trigger condition:
+  Emits a notification when a Codex session line contains
+  type=event_msg and payload.type=task_complete.
+USAGE
+}
+
+sessions_dir="$HOME/.codex/sessions"
+notify_cmd="$HOME/.local/bin/codex-notify"
+interval=1
+title="Codex Agent"
+tmux_target=""
+enable_switch="${CODEX_NOTIFY_ENABLE_SWITCH:-0}"
+start_at_end=1
+verbose=0
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --sessions-dir)
+            sessions_dir="${2:-}"
+            shift 2
+            ;;
+        --notify-cmd)
+            notify_cmd="${2:-}"
+            shift 2
+            ;;
+        --interval)
+            interval="${2:-1}"
+            shift 2
+            ;;
+        --title)
+            title="${2:-}"
+            shift 2
+            ;;
+        --tmux-target)
+            tmux_target="${2:-}"
+            shift 2
+            ;;
+        --enable-switch)
+            enable_switch=1
+            shift
+            ;;
+        --start-at-beginning)
+            start_at_end=0
+            shift
+            ;;
+        --verbose)
+            verbose=1
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            usage >&2
+            exit 2
+            ;;
+    esac
+done
+
+if [[ ! -d "$sessions_dir" ]]; then
+    echo "Sessions dir not found: $sessions_dir" >&2
+    exit 1
+fi
+
+if ! command -v jq >/dev/null 2>&1; then
+    echo "jq is required for codex-watch" >&2
+    exit 1
+fi
+
+if [[ ! -x "$notify_cmd" ]]; then
+    echo "Notify command not executable: $notify_cmd" >&2
+    exit 1
+fi
+
+if ! [[ "$interval" =~ ^[0-9]+$ ]] || [[ "$interval" -lt 1 ]]; then
+    echo "--interval must be a positive integer" >&2
+    exit 2
+fi
+
+declare -A OFFSETS=()
+declare -A SEEN=()
+
+log() {
+    if [[ "$verbose" -eq 1 ]]; then
+        printf '[codex-watch] %s\n' "$*" >&2
+    fi
+}
+
+init_file_offset() {
+    local file="$1"
+    local size
+    size="$(stat -c%s "$file" 2>/dev/null || echo 0)"
+    if [[ "$start_at_end" -eq 1 ]]; then
+        OFFSETS["$file"]="$size"
+    else
+        OFFSETS["$file"]=0
+    fi
+}
+
+process_line() {
+    local line="$1"
+    local parsed
+    parsed="$(printf '%s' "$line" | jq -r 'select(.type == "event_msg" and .payload.type == "task_complete") | .payload.turn_id' 2>/dev/null || true)"
+    [[ -z "$parsed" ]] && return 0
+
+    local turn_id="$parsed"
+
+    if [[ -z "$turn_id" ]]; then
+        return 0
+    fi
+
+    if [[ -n "${SEEN[$turn_id]:-}" ]]; then
+        return 0
+    fi
+
+    SEEN["$turn_id"]=1
+
+    local body="Codex needs your input"
+
+    log "task_complete turn_id=$turn_id"
+
+    if [[ -n "$tmux_target" ]]; then
+        if [[ "$enable_switch" == "1" ]]; then
+            "$notify_cmd" --title "$title" --message "$body" --tmux-target "$tmux_target" --enable-switch >/dev/null 2>&1 || true
+        else
+            "$notify_cmd" --title "$title" --message "$body" --tmux-target "$tmux_target" >/dev/null 2>&1 || true
+        fi
+    else
+        if [[ "$enable_switch" == "1" ]]; then
+            "$notify_cmd" --title "$title" --message "$body" --enable-switch >/dev/null 2>&1 || true
+        else
+            "$notify_cmd" --title "$title" --message "$body" >/dev/null 2>&1 || true
+        fi
+    fi
+}
+
+process_file() {
+    local file="$1"
+    local size start chunk
+
+    size="$(stat -c%s "$file" 2>/dev/null || echo 0)"
+    start="${OFFSETS[$file]:-0}"
+
+    if [[ "$size" -lt "$start" ]]; then
+        start=0
+    fi
+
+    if [[ "$size" -le "$start" ]]; then
+        OFFSETS["$file"]="$size"
+        return 0
+    fi
+
+    chunk="$(tail -c +$((start + 1)) "$file" 2>/dev/null || true)"
+    OFFSETS["$file"]="$size"
+
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        process_line "$line"
+    done <<< "$chunk"
+}
+
+while true; do
+    while IFS= read -r file; do
+        [[ -z "$file" ]] && continue
+        if [[ -z "${OFFSETS[$file]:-}" ]]; then
+            init_file_offset "$file"
+            log "tracking $file from byte ${OFFSETS[$file]}"
+            continue
+        fi
+        process_file "$file"
+    done < <(find "$sessions_dir" -type f -name '*.jsonl' | sort)
+
+    sleep "$interval"
+done

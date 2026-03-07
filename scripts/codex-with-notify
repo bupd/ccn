@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+set -u
+
+notify_cmd="${CODEX_NOTIFY_CMD:-$HOME/.local/bin/codex-notify}"
+watch_cmd="${CODEX_WATCH_CMD:-$HOME/.local/bin/codex-watch}"
+interval="${CODEX_NOTIFY_INTERVAL:-1}"
+title="${CODEX_NOTIFY_TITLE:-Codex Agent}"
+switch_on_click="${CODEX_NOTIFY_ENABLE_SWITCH:-1}"
+
+if ! command -v codex >/dev/null 2>&1; then
+    echo "codex command not found" >&2
+    exit 127
+fi
+
+if [[ ! -x "$watch_cmd" ]]; then
+    echo "codex watcher not found or not executable: $watch_cmd" >&2
+    exit 1
+fi
+
+if [[ ! -x "$notify_cmd" ]]; then
+    echo "codex notify script not found or not executable: $notify_cmd" >&2
+    exit 1
+fi
+
+tmux_target=""
+if [[ -n "${TMUX:-}" ]] && command -v tmux >/dev/null 2>&1; then
+    tmux_target="$(tmux display-message -p '#S:#I.#P' 2>/dev/null || true)"
+fi
+
+watch_pid=""
+cleanup() {
+    if [[ -n "$watch_pid" ]] && kill -0 "$watch_pid" >/dev/null 2>&1; then
+        kill "$watch_pid" >/dev/null 2>&1 || true
+        wait "$watch_pid" >/dev/null 2>&1 || true
+    fi
+}
+trap cleanup EXIT INT TERM
+
+watch_args=(--notify-cmd "$notify_cmd" --interval "$interval" --title "$title")
+if [[ -n "$tmux_target" ]]; then
+    watch_args+=(--tmux-target "$tmux_target")
+fi
+if [[ "$switch_on_click" == "1" ]]; then
+    watch_args+=(--enable-switch)
+fi
+
+"$watch_cmd" "${watch_args[@]}" &
+watch_pid="$!"
+
+codex "$@"
+exit_code=$?
+
+cleanup
+exit "$exit_code"
