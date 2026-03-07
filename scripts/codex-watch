@@ -99,11 +99,36 @@ fi
 
 declare -A OFFSETS=()
 declare -A SEEN=()
+seen_root="${XDG_RUNTIME_DIR:-/tmp}/codex-watch-seen"
+cleanup_counter=0
+
+mkdir -p "$seen_root" >/dev/null 2>&1 || true
 
 log() {
     if [[ "$verbose" -eq 1 ]]; then
         printf '[codex-watch] %s\n' "$*" >&2
     fi
+}
+
+claim_turn_id() {
+    local turn_id="$1"
+    local claim_dir="$seen_root/$turn_id"
+
+    if mkdir "$claim_dir" >/dev/null 2>&1; then
+        date +%s > "$claim_dir/ts" 2>/dev/null || true
+        return 0
+    fi
+
+    return 1
+}
+
+cleanup_claims() {
+    cleanup_counter=$((cleanup_counter + 1))
+    if (( cleanup_counter % 120 != 0 )); then
+        return 0
+    fi
+
+    find "$seen_root" -mindepth 1 -maxdepth 1 -type d -mmin +1440 -exec rm -rf {} + >/dev/null 2>&1 || true
 }
 
 init_file_offset() {
@@ -134,6 +159,15 @@ process_line() {
     fi
 
     SEEN["$turn_id"]=1
+
+    # Prefer tmux-scoped watchers when multiple watchers are running.
+    if [[ -z "$tmux_target" ]]; then
+        sleep 0.15
+    fi
+
+    if ! claim_turn_id "$turn_id"; then
+        return 0
+    fi
 
     local body="Codex needs your input"
 
@@ -180,6 +214,8 @@ process_file() {
 }
 
 while true; do
+    cleanup_claims
+
     while IFS= read -r file; do
         [[ -z "$file" ]] && continue
         if [[ -z "${OFFSETS[$file]:-}" ]]; then
