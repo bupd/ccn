@@ -45,8 +45,17 @@ chmod +x ~/.local/bin/claude-notify
 ## Documentation
 
 - [Installation Guide](https://cc-notify.bupd.xyz/#/installation)
+- [Codex Installation](docs/codex-installation.md)
 - [Configuration](https://cc-notify.bupd.xyz/#/configuration)
 - [Keyboard Navigation](https://cc-notify.bupd.xyz/#/keyboard-navigation)
+
+## Codex
+
+Codex support is available via wrapper scripts and watcher-based notifications.
+
+- Use `codex-with-notify` when you want Codex completion notifications.
+- Why wrapper mode: Claude can use built-in hooks, while Codex uses `codex-watch` + `codex-notify`.
+- Setup guide: [docs/codex-installation.md](docs/codex-installation.md)
 
 ## Why Not a Full Orchestration Tool?
 

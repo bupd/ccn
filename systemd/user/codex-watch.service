@@ -1,0 +1,12 @@
+[Unit]
+Description=Codex session watcher (desktop notifications)
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/codex-watch
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target

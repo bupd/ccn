@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+set -u
+
+usage() {
+    cat <<'USAGE'
+Usage: codex-notify [--title TITLE] [--message MESSAGE] [--tmux-target SESSION:WINDOW.PANE] [--enable-switch]
+
+Options:
+  --title        Notification title (default: Codex Agent)
+  --message      Notification body (default: Needs your attention)
+  --tmux-target  Explicit tmux target to jump to on click
+  --enable-switch  Enable tmux switching action (default: off)
+USAGE
+}
+
+title="Codex Agent"
+message="Needs your attention"
+tmux_target=""
+enable_switch="${CODEX_NOTIFY_ENABLE_SWITCH:-0}"
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --title)
+            title="${2:-}"
+            shift 2
+            ;;
+        --message)
+            message="${2:-}"
+            shift 2
+            ;;
+        --tmux-target)
+            tmux_target="${2:-}"
+            shift 2
+            ;;
+        --enable-switch)
+            enable_switch=1
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        --)
+            shift
+            break
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
+# Backward-compatible positional args: codex-notify "title" "message"
+if [[ $# -ge 1 ]]; then
+    title="$1"
+fi
+if [[ $# -ge 2 ]]; then
+    message="$2"
+fi
+
+if ! command -v dunstify >/dev/null 2>&1; then
+    exit 0
+fi
+
+if [[ -z "$tmux_target" && -n "${TMUX:-}" ]] && command -v tmux >/dev/null 2>&1; then
+    tmux_target="$(tmux display-message -p '#S:#I.#P' 2>/dev/null || true)"
+fi
+
+tmux_socket="${TMUX:-}"
+window_name=""
+if [[ -n "${TMUX:-}" ]] && command -v tmux >/dev/null 2>&1; then
+    window_name="$(tmux display-message -p '#S:#W' 2>/dev/null || true)"
+fi
+
+if [[ -n "$window_name" ]]; then
+    notify_title="$title - $window_name"
+else
+    notify_title="$title"
+fi
+
+if [[ "$enable_switch" != "1" ]]; then
+    dunstify "$notify_title" "$message" -t 20000 >/dev/null 2>&1 || true
+    exit 0
+fi
+
+action="$(dunstify \
+    -A "default,Go to pane" \
+    "$notify_title" \
+    "$message" \
+    -t 20000 \
+    -b || true)"
+
+if [[ "$action" == "default" && -n "$tmux_target" ]] && command -v tmux >/dev/null 2>&1; then
+    if [[ -n "$tmux_socket" ]]; then
+        export TMUX="$tmux_socket"
+    fi
+
+    tmux switch-client -t "$tmux_target" >/dev/null 2>&1 || true
+
+    # Best-effort: focus the terminal window that owns this tmux client in Hyprland.
+    if command -v hyprctl >/dev/null 2>&1; then
+        client_pid="$(tmux list-clients -F '#{session_name}:#{window_index}.#{pane_index} #{client_pid}' 2>/dev/null | awk -v t="$tmux_target" '$1==t {print $2; exit}')"
+        if [[ -n "${client_pid:-}" ]]; then
+            focus_pid="$client_pid"
+            for _ in 1 2 3 4 5 6 7 8; do
+                parent_pid="$(ps -p "$focus_pid" -o ppid= 2>/dev/null | tr -d '[:space:]')"
+                if [[ -z "$parent_pid" || "$parent_pid" == "1" ]]; then
+                    break
+                fi
+
+                parent_comm="$(ps -p "$parent_pid" -o comm= 2>/dev/null | awk '{print $1}')"
+                if [[ "$parent_comm" == "Hyprland" ]]; then
+                    break
+                fi
+
+                focus_pid="$parent_pid"
+            done
+
+            hyprctl dispatch focuswindow "pid:$focus_pid" >/dev/null 2>&1 || true
+        fi
+    fi
+fi
