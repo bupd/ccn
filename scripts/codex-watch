@@ -7,6 +7,7 @@ Usage: codex-watch [options]
 
 Options:
   --sessions-dir DIR       Codex sessions root (default: ~/.codex/sessions)
+  --session-file FILE      Monitor one Codex session file instead of scanning the root
   --notify-cmd PATH        codex-notify command path (default: ~/.local/bin/codex-notify)
   --interval SECONDS       Poll interval (default: 1)
   --title TITLE            Notification title (default: Codex Agent)
@@ -23,6 +24,7 @@ USAGE
 }
 
 sessions_dir="$HOME/.codex/sessions"
+session_file=""
 notify_cmd="$HOME/.local/bin/codex-notify"
 interval=1
 title="Codex Agent"
@@ -35,6 +37,10 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --sessions-dir)
             sessions_dir="${2:-}"
+            shift 2
+            ;;
+        --session-file)
+            session_file="${2:-}"
             shift 2
             ;;
         --notify-cmd)
@@ -77,7 +83,12 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-if [[ ! -d "$sessions_dir" ]]; then
+if [[ -n "$session_file" && ! -f "$session_file" ]]; then
+    echo "Session file not found: $session_file" >&2
+    exit 1
+fi
+
+if [[ -z "$session_file" && ! -d "$sessions_dir" ]]; then
     echo "Sessions dir not found: $sessions_dir" >&2
     exit 1
 fi
@@ -98,6 +109,7 @@ if ! [[ "$interval" =~ ^[0-9]+$ ]] || [[ "$interval" -lt 1 ]]; then
 fi
 
 declare -A OFFSETS=()
+declare -A PARTIALS=()
 declare -A SEEN=()
 seen_root="${XDG_RUNTIME_DIR:-/tmp}/codex-watch-seen"
 cleanup_counter=0
@@ -135,6 +147,7 @@ init_file_offset() {
     local file="$1"
     local size
     size="$(stat -c%s "$file" 2>/dev/null || echo 0)"
+    PARTIALS["$file"]=""
     if [[ "$start_at_end" -eq 1 ]]; then
         OFFSETS["$file"]="$size"
     else
@@ -190,13 +203,15 @@ process_line() {
 
 process_file() {
     local file="$1"
-    local size start chunk
+    local size start chunk ends_with_newline last_byte
 
     size="$(stat -c%s "$file" 2>/dev/null || echo 0)"
     start="${OFFSETS[$file]:-0}"
+    ends_with_newline=0
 
     if [[ "$size" -lt "$start" ]]; then
         start=0
+        PARTIALS["$file"]=""
     fi
 
     if [[ "$size" -le "$start" ]]; then
@@ -204,10 +219,31 @@ process_file() {
         return 0
     fi
 
+    if [[ "$size" -gt 0 ]]; then
+        last_byte="$(tail -c 1 "$file" 2>/dev/null | od -An -t x1 | tr -d '[:space:]')"
+        if [[ "$last_byte" == "0a" ]]; then
+            ends_with_newline=1
+        fi
+    fi
+
     chunk="$(tail -c +$((start + 1)) "$file" 2>/dev/null || true)"
     OFFSETS["$file"]="$size"
+    chunk="${PARTIALS[$file]:-}$chunk"
 
-    while IFS= read -r line; do
+    if [[ "$ends_with_newline" -eq 1 ]]; then
+        PARTIALS["$file"]=""
+        chunk+=$'\n'
+    elif [[ "$chunk" != *$'\n' ]]; then
+        if [[ "$chunk" == *$'\n'* ]]; then
+            PARTIALS["$file"]="${chunk##*$'\n'}"
+            chunk="${chunk%$'\n'*}"$'\n'
+        else
+            PARTIALS["$file"]="$chunk"
+            return 0
+        fi
+    fi
+
+    while IFS= read -r line || [[ -n "$line" ]]; do
         [[ -z "$line" ]] && continue
         process_line "$line"
     done <<< "$chunk"
@@ -216,15 +252,24 @@ process_file() {
 while true; do
     cleanup_claims
 
-    while IFS= read -r file; do
-        [[ -z "$file" ]] && continue
-        if [[ -z "${OFFSETS[$file]:-}" ]]; then
-            init_file_offset "$file"
-            log "tracking $file from byte ${OFFSETS[$file]}"
-            continue
+    if [[ -n "$session_file" ]]; then
+        if [[ -z "${OFFSETS[$session_file]:-}" ]]; then
+            init_file_offset "$session_file"
+            log "tracking $session_file from byte ${OFFSETS[$session_file]}"
+        else
+            process_file "$session_file"
         fi
-        process_file "$file"
-    done < <(find "$sessions_dir" -type f -name '*.jsonl' | sort)
+    else
+        while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+            if [[ -z "${OFFSETS[$file]:-}" ]]; then
+                init_file_offset "$file"
+                log "tracking $file from byte ${OFFSETS[$file]}"
+                continue
+            fi
+            process_file "$file"
+        done < <(find "$sessions_dir" -type f -name '*.jsonl' | sort)
+    fi
 
     sleep "$interval"
 done

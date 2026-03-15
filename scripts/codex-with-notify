@@ -3,9 +3,11 @@ set -u
 
 notify_cmd="${CODEX_NOTIFY_CMD:-$HOME/.local/bin/codex-notify}"
 watch_cmd="${CODEX_WATCH_CMD:-$HOME/.local/bin/codex-watch}"
+sessions_dir="${CODEX_SESSIONS_DIR:-$HOME/.codex/sessions}"
 interval="${CODEX_NOTIFY_INTERVAL:-1}"
 title="${CODEX_NOTIFY_TITLE:-Codex Agent}"
 switch_on_click="${CODEX_NOTIFY_ENABLE_SWITCH:-1}"
+discovery_timeout="${CODEX_NOTIFY_DISCOVERY_TIMEOUT:-10}"
 
 if ! command -v codex >/dev/null 2>&1; then
     echo "codex command not found" >&2
@@ -22,9 +24,75 @@ if [[ ! -x "$notify_cmd" ]]; then
     exit 1
 fi
 
+if [[ ! -d "$sessions_dir" ]]; then
+    echo "codex sessions dir not found: $sessions_dir" >&2
+    exit 1
+fi
+
+if ! [[ "$discovery_timeout" =~ ^[0-9]+$ ]] || [[ "$discovery_timeout" -lt 1 ]]; then
+    echo "CODEX_NOTIFY_DISCOVERY_TIMEOUT must be a positive integer" >&2
+    exit 2
+fi
+
 tmux_target=""
 if [[ -n "${TMUX:-}" ]] && command -v tmux >/dev/null 2>&1; then
     tmux_target="$(tmux display-message -p '#S:#I.#P' 2>/dev/null || true)"
+fi
+
+resolve_sessions_dir() {
+    cd "$sessions_dir" 2>/dev/null && pwd -P
+}
+
+collect_descendant_pids() {
+    local queue=("$1")
+    local next_queue=()
+    local pid child
+
+    while (( ${#queue[@]} > 0 )); do
+        next_queue=()
+        for pid in "${queue[@]}"; do
+            while IFS= read -r child; do
+                [[ -z "$child" ]] && continue
+                printf '%s\n' "$child"
+                next_queue+=("$child")
+            done < <(pgrep -P "$pid" || true)
+        done
+        queue=("${next_queue[@]}")
+    done
+}
+
+wait_for_session_file() {
+    local wrapper_pid="$1"
+    local sessions_root="$2"
+    local deadline=$((SECONDS + discovery_timeout))
+    local pid fd path
+
+    while (( SECONDS < deadline )); do
+        while IFS= read -r pid; do
+            [[ -d "/proc/$pid/fd" ]] || continue
+            for fd in /proc/"$pid"/fd/*; do
+                path="$(readlink -f "$fd" 2>/dev/null || true)"
+                if [[ "$path" == "$sessions_root/"*.jsonl ]]; then
+                    printf '%s\n' "$path"
+                    return 0
+                fi
+            done
+        done < <(collect_descendant_pids "$wrapper_pid")
+
+        if ! kill -0 "$wrapper_pid" >/dev/null 2>&1; then
+            break
+        fi
+
+        sleep 0.1
+    done
+
+    return 1
+}
+
+sessions_root="$(resolve_sessions_dir)"
+if [[ -z "$sessions_root" ]]; then
+    echo "failed to resolve codex sessions dir: $sessions_dir" >&2
+    exit 1
 fi
 
 watch_pid=""
@@ -44,7 +112,11 @@ if [[ "$switch_on_click" == "1" ]]; then
     watch_args+=(--enable-switch)
 fi
 
-"$watch_cmd" "${watch_args[@]}" &
+wrapper_pid="$$"
+(
+    session_file="$(wait_for_session_file "$wrapper_pid" "$sessions_root")" || exit 0
+    exec "$watch_cmd" "${watch_args[@]}" --session-file "$session_file"
+) &
 watch_pid="$!"
 
 codex "$@"

@@ -55,6 +55,7 @@ Codex support is available via wrapper scripts and watcher-based notifications.
 
 - Use `codex-with-notify` when you want Codex completion notifications.
 - Why wrapper mode: Claude can use built-in hooks, while Codex uses `codex-watch` + `codex-notify`.
+- Wrapper mode binds notifications to the specific Codex session it launched, so concurrent tmux panes stay routed correctly.
 - Setup guide: [docs/codex-installation.md](docs/codex-installation.md)
 
 ## Why Not a Full Orchestration Tool?

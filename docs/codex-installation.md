@@ -53,6 +53,8 @@ Codex does not currently expose the same hook flow for this use case, so plain `
 
 `codex-with-notify` solves this by starting `codex-watch` in the background while Codex runs, then cleaning it up when Codex exits. This gives you Claude-like completion notifications for Codex.
 
+When you launch multiple Codex panes at once, the wrapper binds its watcher to the exact session file opened by that Codex process. That keeps pane-jump notifications attached to the correct tmux pane instead of racing across all active sessions.
+
 ## Optional Always-on Watcher (global alerts)
 
 This mode notifies for Codex completions across sessions, even when you do not use the wrapper.
@@ -107,6 +109,14 @@ dunstify "Test" "Codex notification test"
 
 - Use `codex-with-notify` inside tmux (recommended)
 - Ensure a tmux client is attached
+
+### Non-default sessions directory
+
+If your Codex sessions live somewhere other than `~/.codex/sessions`, set:
+
+```bash
+export CODEX_SESSIONS_DIR=/path/to/codex/sessions
+```
 
 ### Watcher debug mode
 
